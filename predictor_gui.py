@@ -1,6 +1,6 @@
 # Description: This script is used to predict the price of a diamond based on its carat, x, y, and z values.
 # Authors: Kaedyn Quinn (u3261368) and Tom Hawke (u3239388)
-# Tutorial Times: Tom - Wednesday 9:30 am, Kaedyn - Thursday 10:30 am
+# Tutorial Times: Tom - Wednesday 9:30 am, Kaedyn - Thursday 1:30 pm
 
 import tkinter as tk
 from tkinter import messagebox
