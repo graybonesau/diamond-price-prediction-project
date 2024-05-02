@@ -15,9 +15,11 @@ from tkinter import messagebox
 import matplotlib.pyplot as plt
 from xgboost import XGBRegressor
 from sklearn.pipeline import Pipeline
+from google.colab.output import eval_js
+from flask import Flask, request, jsonify
 from sklearn.preprocessing import LabelEncoder
-from flask import Flask, request
 from sklearn.tree import DecisionTreeRegressor
+from sklearn.metrics import mean_squared_error
 from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor
@@ -25,139 +27,165 @@ from sklearn.model_selection import cross_val_score
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-# Supressing the warning messages
+# Ignoring warnings.
+print("Ignoring warnings..."
 warn.filterwarnings('ignore')
 
-# Reading the dataset.
+# Reading the data.
+print("Reading the data...")
 diamondData = pd.read_csv('diamonds.csv')
 
-# Printing sample data.
-print("### Viewing the data.")
-print(diamondData.head())
+# Viewing the data.
+print("Printing the data...")
+diamondData.head()
 
+# Plotting the price data on a histogram.
+print("Plotting the price on a histogram...")
 graph = sns.histplot(data = diamondData, x = "price")
 graph.set_title("price distribution")
 graph.set_ylabel("count")
-plt.show()
+
+# Creating a copy of the data with a more even skewing.
+print("Copying the data...")
+logDiamondData = diamondData.copy()
+print("Calculating the natural logarithm of the price...")
+logDiamondData['price'] = np.log(diamondData['price'])
+
+# Plotting the price data on a histogram.
+print("Plotting the natural logarithm of the price on a histogram...")
+graph = sns.histplot(data = logDiamondData, x = "price")
+graph.set_title("price distribution (log transformed)")
+graph.set_xlabel("log(price)")
+graph.set_ylabel("count")
 
 # The first column is just an index, which is unneeded.
-diamondData = diamondData.drop(["Unnamed: 0"], axis=1)
-print("### Viewing the data after removing the index column.")
-print(diamondData.head())
+print("Dropping the index column...")
+logDiamondData = logDiamondData.drop(["Unnamed: 0"], axis=1)
+logDiamondData.head()
 
 # Describing the data to identify problems with the dataset.
-print("### Describing the data to identify problems with the dataset.")
-print(diamondData.describe())
+print("Describing the data...")
+logDiamondData.describe()
 
 # Dropping dimensionless (impossible) diamonds.
-diamondData = diamondData.drop(diamondData[diamondData["x"]==0].index)
-diamondData = diamondData.drop(diamondData[diamondData["y"]==0].index)
-diamondData = diamondData.drop(diamondData[diamondData["z"]==0].index)
-diamondData.describe()
+print("Dropping dimensionless diamonds...")
+logDiamondData = logDiamondData.drop(logDiamondData[logDiamondData["x"]==0].index)
+logDiamondData = logDiamondData.drop(logDiamondData[logDiamondData["y"]==0].index)
+logDiamondData = logDiamondData.drop(logDiamondData[logDiamondData["z"]==0].index)
+logDiamondData.describe()
 
 # Printing the cleaned data.
-print("### Printing the cleaned data.")
-print('Shape:', diamondData.shape)
+print("Printing the shape of the cleaned data...")
+print('Shape:', logDiamondData.shape)
 
 # Creating a pair plot for the dataset, using Cut as the hue. Additionally, we can explore other hue attributes with fewer instances.
-# graph = sns.pairplot(diamondData, hue = "cut", diag_kind = 'hist')
-# plt.show()
+print("Plotting the dataset on a pair plot...")
+graph.set_title("dataset pair plot")
+graph = sns.pairplot(logDiamondData, hue = "cut", diag_kind = 'hist')
 
 # Creating a regression plot for the price versus the y-axis.
-graph = sns.regplot(data = diamondData, x = "price", y = "y", fit_reg = True, line_kws = {"color": "#000000"})
+print("Plotting the price versus the y-dimension on a regression plot...")
+graph = sns.regplot(data = logDiamondData, x = "price", y = "y", fit_reg = True, line_kws = {"color": "#000000"})
 graph.set_title("price vs. y-axis")
-plt.show()
 
 # Creating a regression plot for the price versus the z-axis.
-graph = sns.regplot(data = diamondData, x = "price", y = "z", fit_reg = True, line_kws = {"color": "#000000"})
+print("Plotting the price versus the z-dimension on a regression plot...")
+graph = sns.regplot(data = logDiamondData, x = "price", y = "z", fit_reg = True, line_kws = {"color": "#000000"})
 graph.set_title("price vs. z-axis")
-plt.show()
 
 # Creating a regression plot for the price versus the depth.
-graph = sns.regplot(data = diamondData, x = "price", y = "depth", fit_reg = True, line_kws = {"color": "#000000"})
+print("Plotting the price versus the depth on a regression plot...")
+graph = sns.regplot(data = logDiamondData, x = "price", y = "depth", fit_reg = True, line_kws = {"color": "#000000"})
 graph.set_title("price vs. depth")
-plt.show()
 
 # Creating a regression plot for the price versus the table.
-graph = sns.regplot(data = diamondData, x = "price", y = "table", fit_reg = True, line_kws = {"color": "#000000"})
+print("Plotting the price versus the table on a regression plot...")
+graph = sns.regplot(data = logDiamondData, x = "price", y = "table", fit_reg = True, line_kws = {"color": "#000000"})
 graph.set_title("price vs. table")
-plt.show()
 
 # Creating a violin plot for the price to look for outliers.
-plt.figure(figsize=(12,8))
-graph = sns.violinplot(data = diamondData, x = "price", density_norm = "count")
+print("Plotting the price on a violin plot...")
+graph = sns.violinplot(data = logDiamondData, x = "price", density_norm = "count")
 graph.set_title("price")
 graph.set_ylabel("count")
 graph.set_xlabel("price")
-plt.show()
 
 # Creating a violin plot for the cut versus the price.
-plt.figure(figsize=(12,8))
-graph = sns.violinplot(data = diamondData, x = "cut", y = "price", density_norm = "count")
+print("Plotting the cut versus the price on a violin plot...")
+graph = sns.violinplot(data = logDiamondData, x = "cut", y = "price", density_norm = "count")
 graph.set_title("cut vs. price")
 graph.set_ylabel("price")
 graph.set_xlabel("cut")
-plt.show()
 
 # Creating a violin plot for the colour versus the price.
-plt.figure(figsize=(12,8))
-graph = sns.violinplot(data = diamondData, x = "color", y = "price", density_norm = "count")
+print("Plotting the colour versus the price on a violin plot...")
+graph = sns.violinplot(data = logDiamondData, x = "color", y = "price", density_norm = "count")
 graph.set_title("color vs. price")
 graph.set_ylabel("price")
 graph.set_xlabel("color")
-plt.show()
 
 # Creating a violin plot for the clarity versus the price.
-plt.figure(figsize=(12,8))
-graph = sns.violinplot(data = diamondData, x = "clarity", y = "price", density_norm = "count")
+print("Plotting the clarity versus the price on a violin plot...")
+graph = sns.violinplot(data = logDiamondData, x = "clarity", y = "price", density_norm = "count")
 graph.set_title("clarity vs. price")
 graph.set_ylabel("price")
 graph.set_xlabel("clarity")
-plt.show()
 
 # Removing the outliers.
-diamondData = diamondData[(diamondData["y"] < 30)]
-diamondData = diamondData[(diamondData["z"] < 30) & (diamondData["z"] > 2)]
-diamondData = diamondData[(diamondData["price"] < 10500)]
-diamondData = diamondData[(diamondData["table"] < 80) & (diamondData["table"] > 40)]
-diamondData = diamondData[(diamondData["depth"] < 75) & (diamondData["depth"] > 45)]
-diamondData.shape
+print("Removing the outliers...")
+logDiamondData = logDiamondData[(logDiamondData["y"] < 30)]
+logDiamondData = logDiamondData[(logDiamondData["z"] < 30) & (logDiamondData["z"] > 2)]
+logDiamondData = logDiamondData[(logDiamondData["table"] < 80) & (logDiamondData["table"] > 40)]
+logDiamondData = logDiamondData[(logDiamondData["depth"] < 75) & (logDiamondData["depth"] > 45)]
+logDiamondData.shape
+
 # Creating a pair plot for the dataset, using Cut as the hue.
-# graph = sns.pairplot(diamondData, hue = "cut", diag_kind = "hist")
-# plt.show()
+print("Plotting the cleaned dataset on a pair plot...")
+graph.set_title("dataset pair plot")
+graph = sns.pairplot(logDiamondData, hue = "cut", diag_kind = "hist")
 
 # Creating a list of the categorical variables.
-objects = (diamondData.dtypes =="object")
+print("Listing the categorical variables...")
+objects = (logDiamondData.dtypes == "object")
 categories = list(objects[objects].index)
 
 # Creating a new copy of the table to avoid destroying original data.
-numericalDiamondData = diamondData.copy()
+print("Copying the dataset...")
+numericalDiamondData = logDiamondData.copy()
 
 # Applying the label encoder to each column containing categorical data.
+print("Label encoding the dataset...")
 for columns in categories:
     numericalDiamondData[columns] = LabelEncoder().fit_transform(numericalDiamondData[columns])
 numericalDiamondData.head()
 
+# Describing the data with the label encoded data.
+print("Describing the data with the newly label encoded data...")
 numericalDiamondData.describe()
 
 # Creating a correlation matrix in order to discern what attributes should and should not be dropped.
+print("Creating a correlation matrix...")
 correlation = numericalDiamondData.corr()
 graph = plt.subplots(figsize=(12,12))
 graph = sns.heatmap(correlation, annot = True)
 graph.set_title("correlation matrix")
-plt.show()
 
-# Saving the final dataset as a pickle file.
+# Saving the final dataset as a pickle file with the best-correlating attributes (carat, x, y and z)
+print("Saving the final dataset as a pickle file with the best-correlating predictors (carat, x, y and z)...")
 columns = ['carat', 'x', 'y', 'z']
 finalData = numericalDiamondData[columns]
 finalData.to_pickle('finalData.pkl')
 
 # Assigning all non-price attributes as the features, and the price attribute as the target.
+print("Assigning all non-price attributes as features...")
 predictors = finalData
+print("Assigning price as the target variable...")
 targetVariable = numericalDiamondData["price"]
+print("Defining the training and testing datasets...")
 x_train, x_test, y_train, y_test = train_test_split(predictors, targetVariable, test_size = 0.3, random_state = 42)
 
 # Building pipelines, using two different scalers and five different regression algorithms to find the best normaliser and regressor.
+print("Building pipelines using two different scalers and five different regressors...")
 pipeline_lrss = Pipeline([("scaler1", StandardScaler()), ("lr_classifier", LinearRegression())])
 pipeline_lrmm = Pipeline([("scaler2", MinMaxScaler()), ("lr_classifier", LinearRegression())])
 pipeline_dtss = Pipeline([("scaler3", StandardScaler()), ("dt_classifier", DecisionTreeRegressor())])
@@ -170,37 +198,45 @@ pipeline_xgbss = Pipeline([("scaler9", StandardScaler()), ("rf_classifier", XGBR
 pipeline_xgbmm = Pipeline([("scaler10", MinMaxScaler()), ("rf_classifier", XGBRegressor())])
 
 # Listing all the pipelines.
+print("Listing all the pipelines...")
 pipelines = [pipeline_lrss, pipeline_lrmm, pipeline_dtss, pipeline_dtmm, pipeline_rfss, pipeline_rfmm, pipeline_knss, pipeline_knmm, pipeline_xgbss, pipeline_xgbmm]
 
 # Creating a dictionary.
+print("Creating a dictionary...")
 pipe_dict = {0: "Linear Regression, Standard Normalisation", 1: "Linear Regression, Minmax Normalisation", 2: "Decision Tree, Standard Normalisation", 3: "Decision Tree, Minmax Normalisation", 4: "Random Forest, Standard Normalisation", 5: "Random Forest, Minmax Normalisation", 6: "K-Nearest Neighbors, Standard Normalisation", 7: "K-Nearest Neighbors, Minmax Normalisation", 8: "XGBoost Regressor, Standard Normalisation", 9: "XGBoost Regressor, Minmax Normalisation"}
 
 # Fitting the pipelines.
+print("Fitting the pipelines...")
 for pipe in pipelines:
     pipe.fit(x_train, y_train)
 
 # Cross validating the pipelines using negative root mean squared error as the scoring metric.
+print("Cross validating the algorithms...")
 cv_results_rms = []
 for i, model in enumerate(pipelines):
-    cv_score = cross_val_score(model, x_train, y_train, scoring = "neg_root_mean_squared_error", cv = 10)
+    cv_score = cross_val_score(model, x_train, y_train, scoring = "r2", cv = 10)
     cv_results_rms.append(cv_score)
     print("%s: %f " % (pipe_dict[i], cv_score.mean()))
 
 # Running model predictions using the Random Forest regressor with minmax normalisation.
-rfmmprediction = pipeline_rfmm.predict(x_test)
+print("Running model predictions using Random Forest regression with minmax normalisation...")
+lrssprediction = pipeline_lrss.predict(x_test)
 
 # Running model predictions using the XGBoost regressor with standard normalisation.
+print("Running model predictions using XGBoost regression with standard normalisation...")
 xgbssprediction = pipeline_xgbss.predict(x_test)
 
 # Printing the model evaluations for Random Forest with minmax normalisation.
-print("R2:", metrics.r2_score(y_test, rfmmprediction))
-print("Adjusted R2:", 1 - (1 - metrics.r2_score(y_test, rfmmprediction)) * (len(y_test) - 1) / (len(y_test) - x_test.shape[1]-1))
-print("MAE:", metrics.mean_absolute_error(y_test, rfmmprediction))
-print("MSE:", metrics.mean_squared_error(y_test, rfmmprediction))
-print("RMSE:", np.sqrt(metrics.mean_squared_error(y_test, rfmmprediction)))
-print("MAPE:", metrics.mean_absolute_percentage_error(y_test, rfmmprediction))
+print("Printing the model evaluations for Random Forest with minmax normalisation.")
+print("R2:", metrics.r2_score(y_test, lrssprediction))
+print("Adjusted R2:", 1 - (1 - metrics.r2_score(y_test, lrssprediction)) * (len(y_test) - 1) / (len(y_test) - x_test.shape[1]-1))
+print("MAE:", metrics.mean_absolute_error(y_test, lrssprediction))
+print("MSE:", metrics.mean_squared_error(y_test, lrssprediction))
+print("RMSE:", np.sqrt(metrics.mean_squared_error(y_test, lrssprediction)))
+print("MAPE:", metrics.mean_absolute_percentage_error(y_test, lrssprediction))
 
 # Printing the model evaluations for the XGBoost regressor with standard normalisation.
+print("Printing the model evaluations for the XGBoost regressor with standard normalisation.")
 print("R2:", metrics.r2_score(y_test, xgbssprediction))
 print("Adjusted R2:", 1 - (1 - metrics.r2_score(y_test, xgbssprediction)) * (len(y_test) - 1) / (len(y_test) - x_test.shape[1]-1))
 print("MAE:", metrics.mean_absolute_error(y_test, xgbssprediction))
@@ -209,29 +245,36 @@ print("RMSE:", np.sqrt(metrics.mean_squared_error(y_test, xgbssprediction)))
 print("MAPE:", metrics.mean_absolute_percentage_error(y_test, xgbssprediction))
 
 # Assigning all non-price attributes as the features, and the price attribute as the target.
-
 predictors = finalData
 targetVariable = numericalDiamondData["price"]
 x_train, x_test, y_train, y_test = train_test_split(predictors, targetVariable, test_size = 0.3, random_state = 42)
 
 # Storing the fit object for later reference
-predictorScaler = MinMaxScaler().fit(predictors)
+print("Storing the fit of the predictors for later reference...")
+predictorScaler = StandardScaler().fit(predictors)
 
 # Generating the standardized values of X
+print("Generating standardised values of X...")
 predictors = predictorScaler.transform(predictors)
 
+# Outputting the shape of the predictors and target to check for errors.
+print("Printing the shape of the predictors and target to check for errors...")
 print(predictors.shape)
 print(targetVariable.shape)
 
 # Training the model, using 100 per cent of the available data.
-model = RandomForestRegressor(max_depth = 2)
+print("Training the model with the full dataset...")
+model = XGBRegressor()
 finalModel = model.fit(predictors, targetVariable)
 
 # Saving the model as a serialised file.
+print("Saving the model...")
 with open('finalModel.pkl', 'wb') as fileWriteStream:
     pickle.dump(finalModel, fileWriteStream)
     fileWriteStream.close()
 
+# Creating a test function to use the model to predict new input data.
+print("Creating a prediction testing function...")
 def generatePredictionTest(inputDataTest):
     inputNo = inputDataTest.shape[0]
 
@@ -256,15 +299,18 @@ def generatePredictionTest(inputDataTest):
     # Generating a prediction.
     predictionTest = finalModelTest.predict(predictorsTest)
     resultTest = pd.DataFrame(predictionTest, columns = ['Prediction'])
-    return(resultTest)
+    return(np.exp(resultTest))
 
 # Creating some data to predict the price for.
+print("Creating test data...")
 testData = pd.DataFrame(data=[[0.23, 3.95, 3.98, 2.43],[0.21, 3.89, 3.84, 2.31],[0.71, 5.65, 5.68, 3.57],[1.02, 6.28, 6.23, 4.02]], columns = ['carat', 'x', 'y', 'z'])
 
-# Calling the prediction function.
+# Calling the test prediction function.
+print("Calling the prediction testing function...")
 generatePredictionTest(inputDataTest = testData)
 
-# Creating the function which can take in inputs, and return a prediction.
+# Creating the complete function to integrate with the API.
+print("Creating a complete prediction function...")
 def generatePrediction(inp_carat, inp_x, inp_y, inp_z):
 
     # Creating a data frame for the model input.
@@ -276,11 +322,13 @@ def generatePrediction(inp_carat, inp_x, inp_y, inp_z):
     # Returning the predictions.
     return(predictions.to_json())
 
-# Calling the function.
+# Calling the function to see if it works.
+print("Calling the complete prediction function with test data...")
 generatePrediction(inp_carat = 0.23, inp_x = 3.95, inp_y = 3.98, inp_z = 2.43)
 
-# Installing the prerequisite micro web framework.
 
+# Creating the Flask app and instructing it how to use the function created above.
+print("Creating a Flask app for API integration...")
 app = Flask(__name__)
 
 @app.route('/prediction_api', methods=["GET"])
@@ -299,7 +347,7 @@ def prediction_api():
     return('Something is not right!:' + str(error))
 
 # Running the Flask app at localhost on port 9000.
-print("###### Click the following link: http://127.0.0.1:9000/prediction_api?carat=0.23&x=3.95&y=3.98&z=2.43 ######")
+# Test if it works by adding the following parameters to the end of the URL: /prediction_api?carat=0.23&x=3.95&y=3.98&z=2.43
+print("Running the Flask app at localhost on port 9000..."
 if __name__ =="__main__":
-  # Do NOT use the URL that is outputted in this code block. Use the URL above.
   app.run(host = '127.0.0.1', port = 9000)
