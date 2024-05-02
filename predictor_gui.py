@@ -2,46 +2,47 @@
 # Authors: Kaedyn Quinn (u3261368) and Tom Hawke (u3239388)
 # Tutorial Times: Tom - Wednesday 9:30 am, Kaedyn - Thursday 1:30 pm
 
-import tkinter as tk
-from tkinter import messagebox
-from tkinter import ttk
+import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+from xgboost import XGBRegressor
 from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
 
 class diamondPricePrediction:
     def __init__(self, master):
         self.master = master
         self.master.title('Diamond Price Prediction')
-        
+
         self.data = pd.read_csv('diamonds.csv')
-        self.data = self.data.drop(["Unnamed: 0"], axis=1)
-        self.data = self.data[(self.data["y"] < 30)]
-        self.data = self.data[(self.data["z"] < 30) & (self.data["z"] > 2)]
-        self.data = self.data[(self.data["price"] < 10500)]
-        self.data = self.data[(self.data["table"] < 80) & (self.data["table"] > 40)]
-        self.data = self.data[(self.data["depth"] < 75) & (self.data["depth"] > 45)]
-        self.objects = (self.data.dtypes == "object")
+        self.logData["price"] = np.log(self.data["price"])
+        self.logData = self.logData.drop(["Unnamed: 0"], axis=1)
+        self.logData = self.logData[(self.logData["y"] < 30)]
+        self.logData = self.logData[(self.logData["z"] < 30) & (self.logData["z"] > 2)]
+        self.logData = self.logData[(self.logData["table"] < 80) & (self.logData["table"] > 40)]
+        self.logData = self.logData[(self.logData["depth"] < 75) & (self.logData["depth"] > 45)]
+        self.objects = (self.logData.dtypes == "object")
         self.categories = list(self.objects[self.objects].index)
-        self.numData = self.data.copy()
+        self.numData = self.logData.copy()
         self.sliders = []
 
         self.makeNumData()
-        
+
         self.finalData = self.numData.drop(["price"], axis = 1)
         self.finalData = self.finalData.drop(["cut"], axis = 1)
         self.finalData = self.finalData.drop(["clarity"], axis = 1)
         self.finalData = self.finalData.drop(["color"], axis = 1)
         self.finalData = self.finalData.drop(["table"], axis = 1)
         self.finalData = self.finalData.drop(["depth"], axis = 1)
-        
+
         self.predictors = self.finalData.values
         self.target = self.numData['price'].values
 
         self.predictors_train, self.predictors_test, self.target_train, self.target_test = train_test_split(self.predictors, self.target, test_size=0.3, random_state=42)
 
-        self.model = RandomForestRegressor(max_depth = 2)
+        self.model = XGBRegressor()
         self.model.fit(self.predictors_train, self.target_train)
 
         self.createWidgets()
@@ -66,10 +67,11 @@ class diamondPricePrediction:
 
     def predictPrice(self):
         inputs = [float(slider.get()) for slider, _ in self.sliders]
-        price = self.model.predict([inputs])
+        price = np.exp(self.model.predict([inputs]))
         messagebox.showinfo('Predicted Price', f'The predicted diamond\'s price is ${price[0]:.2f}')
 
 if __name__ == '__main__':
     root = tk.Tk()
     app = diamondPricePrediction(root)
     root.mainloop()
+    
